@@ -23,7 +23,7 @@ from .primitives import ResNetBasicblock
 NUM_EDGES = 6
 NUM_OPS = 5
 
-OP_NAMES = ["Identity", "Zero", "ReLUConvBN3x3", "ReLUConvBN1x1", "AvgPool1x1"]
+OP_NAMES = ["Identity", "Zero", "ReLUConvBN3x3", "ReLUCладноonvBN1x1", "AvgPool1x1"]
 
 
 class NasBench201SearchSpace(Graph):

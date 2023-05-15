@@ -71,7 +71,7 @@ def default_argument_parser():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--config-file", default=None,
+    parser.add_argument("--config-file", default="/home/mikhail/NASLib/examples/config_spiking.yaml",
                         metavar="FILE", help="path to config file")
     parser.add_argument(
         "--eval-only", action="store_true", help="perform evaluation only"
@@ -124,7 +124,8 @@ def default_argument_parser():
 def parse_args(parser=default_argument_parser(), args=sys.argv[1:]):
     if "-f" in args:
         args = args[2:]
-    return parser.parse_args(args)
+    # return parser.parse_args(args)
+    return parser.parse_args("--config-file /home/mikhail/NASLib/examples/config_spiking.yaml".split())
 
 
 def pairwise(iterable):

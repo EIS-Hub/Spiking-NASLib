@@ -120,13 +120,13 @@ class Graph(torch.nn.Module, nx.DiGraph):
         # across different Graph instances.
 
         # self._nxgraph.edge_attr_dict_factory = lambda: EdgeData()
-        self.edge_attr_dict_factory = lambda: EdgeData()
+        # self.edge_attr_dict_factory = self.edge_attr_dict_factory
 
         # Replace the default dicts at the nodes to include `input` from the beginning.
         # `input` is required for storing the results of incoming edges.
 
         # self._nxgraph.node_attr_dict_factory = lambda: dict({'input': {}, 'comb_op': sum})
-        self.node_attr_dict_factory = lambda: dict({"input": {}, "comb_op": sum})
+        # self.node_attr_dict_factory = self.node_attr_dict_factory
 
         # remember to add all members also in `unparse()`
         self.name = name
@@ -135,6 +135,12 @@ class Graph(torch.nn.Module, nx.DiGraph):
         self.is_parsed = False
         self._id = random.random()  # pytorch expects unique modules in `add_module()`
 
+    def edge_attr_dict_factory(self):
+        return EdgeData()
+    
+    def node_attr_dict_factory(self):
+        return dict({"input": {}, "comb_op": sum})
+    
     def __eq__(self, other):
         return self.name == other.name and self.scope == other.scope
 

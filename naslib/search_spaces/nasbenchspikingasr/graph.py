@@ -9,6 +9,7 @@ from naslib.search_spaces.core import primitives as core_ops
 from naslib.search_spaces.core.query_metrics import Metric
 from naslib.search_spaces.core.graph import Graph
 from naslib.search_spaces.nasbenchspikingasr.primitives import CellLayerNorm, Head, ops
+
 # from naslib.search_spaces.nasbenchasr.primitives import CellLayerNorm, Head, ops, PadConvReluNorm
 from naslib.utils import get_project_root
 from naslib.search_spaces.nasbenchasr.conversions import flatten, \
@@ -19,7 +20,7 @@ from naslib.utils.encodings import EncodingType
 OP_NAMES = ['linear', 'relu', 'sigmoid', 'tanh', 'gaussian', 'zero']
 
 
-class NasBenchASRSearchSpace(Graph):
+class NasBenchSpikingASRSearchSpace(Graph):
     """
     Contains the interface to the tabular benchmark of nas-bench-asr.
     Note: currently we do not support building a naslib object for
@@ -47,11 +48,8 @@ class NasBenchASRSearchSpace(Graph):
         self.features = 100
         # self.filters = [600, 800, 1000, 1200]
         self.filters = [100, 100, 100, 100]
-        # import sys
-        # sys.exit()
-        self.cnn_time_reduction_kernels = [8, 8, 8, 8]
-        self.cnn_time_reduction_strides = [1, 1, 2, 2]
-        self.scells_per_block = [3, 4, 5, 6]
+        # self.cnn_time_reduction_kernels = [8, 8, 8, 8]
+        # self.cnn_time_reduction_strides = [1, 1, 2, 2]
         self.num_classes = 20
         self.dropout_rate = 0.0
         self.use_norm = True
@@ -59,8 +57,8 @@ class NasBenchASRSearchSpace(Graph):
         self._create_macro_graph()
 
         # print("self.get_all_edge_data", self.get_all_edge_data("weights"))
-        print(self._get_child_graphs(single_instances=True))
-        print(self.get_edge_info())
+        # print(self._get_child_graphs(single_instances=True))
+        # print(self.get_edge_info())
 
     def _create_macro_graph(self):
         cell = self._create_cell()
@@ -100,7 +98,8 @@ class NasBenchASRSearchSpace(Graph):
 
         #     self.edges[node, node + 1].set('op', op)
 
-        # Assign the LSTM + Linear layer to the last edge in the macro graph
+        # TODO: see if we can remove this
+        # Assign the LSTM + Linear layer to the last edge in the macro graph (currently no lstm)
         head = Head(self.dropout_rate, self.filters[-1], self.num_classes)
         self.edges[self.n_blocks + 1, self.n_blocks + 2].set('op', head)
 
@@ -149,48 +148,50 @@ class NasBenchASRSearchSpace(Graph):
     def query(self, metric=None, dataset=None, path=None, epoch=-1,
               full_lc=False, dataset_api=None):
         """
-        Query results from nas-bench-asr
+        Calculate the metric for the given dataset and path. Calls the calculation of the metric
         """
-        metric_to_asr = {
-            Metric.VAL_ACCURACY: "val_per",
-            Metric.TEST_ACCURACY: "test_per",
-            Metric.PARAMETERS: "params",
-            Metric.FLOPS: "flops",
-        }
+        
+        pass
+        # metric_to_asr = {
+        #     Metric.VAL_ACCURACY: "val_per",
+        #     Metric.TEST_ACCURACY: "test_per",
+        #     Metric.PARAMETERS: "params",
+        #     Metric.FLOPS: "flops",
+        # }
 
-        assert self.compact is not None
-        assert metric in [
-            Metric.TRAIN_ACCURACY,
-            Metric.TRAIN_LOSS,
-            Metric.VAL_ACCURACY,
-            Metric.TEST_ACCURACY,
-            Metric.PARAMETERS,
-            Metric.FLOPS,
-            Metric.TRAIN_TIME,
-            Metric.RAW,
-        ]
-        query_results = dataset_api["asr_data"].full_info(self.compact)
+        # assert self.compact is not None
+        # assert metric in [
+        #     Metric.TRAIN_ACCURACY,
+        #     Metric.TRAIN_LOSS,
+        #     Metric.VAL_ACCURACY,
+        #     Metric.TEST_ACCURACY,
+        #     Metric.PARAMETERS,
+        #     Metric.FLOPS,
+        #     Metric.TRAIN_TIME,
+        #     Metric.RAW,
+        # ]
+        # query_results = dataset_api["asr_data"].full_info(self.compact)
 
-        if metric != Metric.VAL_ACCURACY:
-            if metric == Metric.TEST_ACCURACY:
-                return query_results[metric_to_asr[metric]]
-            elif (metric == Metric.PARAMETERS) or (metric == Metric.FLOPS):
-                return query_results['info'][metric_to_asr[metric]]
-            elif metric in [Metric.TRAIN_ACCURACY, Metric.TRAIN_LOSS,
-                            Metric.TRAIN_TIME, Metric.RAW]:
-                return -1
-        else:
-            if full_lc and epoch == -1:
-                return [
-                    loss for loss in query_results[metric_to_asr[metric]]
-                ]
-            elif full_lc and epoch != -1:
-                return [
-                    loss for loss in query_results[metric_to_asr[metric]][:epoch]
-                ]
-            else:
-                # return the value of the metric only at the specified epoch
-                return float(query_results[metric_to_asr[metric]][epoch])
+        # if metric != Metric.VAL_ACCURACY:
+        #     if metric == Metric.TEST_ACCURACY:
+        #         return query_results[metric_to_asr[metric]]
+        #     elif (metric == Metric.PARAMETERS) or (metric == Metric.FLOPS):
+        #         return query_results['info'][metric_to_asr[metric]]
+        #     elif metric in [Metric.TRAIN_ACCURACY, Metric.TRAIN_LOSS,
+        #                     Metric.TRAIN_TIME, Metric.RAW]:
+        #         return -1
+        # else:
+        #     if full_lc and epoch == -1:
+        #         return [
+        #             loss for loss in query_results[metric_to_asr[metric]]
+        #         ]
+        #     elif full_lc and epoch != -1:
+        #         return [
+        #             loss for loss in query_results[metric_to_asr[metric]][:epoch]
+        #         ]
+        #     else:
+        #         # return the value of the metric only at the specified epoch
+        #         return float(query_results[metric_to_asr[metric]][epoch])
 
     def get_edge_info(self):
         edge_info = {}
@@ -277,7 +278,7 @@ class NasBenchASRSearchSpace(Graph):
 
         def add_to_nbhd(new_compact, nbhd):
             print(new_compact)
-            nbr = NasBenchASRSearchSpace()
+            nbr = NasBenchSpikingASRSearchSpace()
             nbr.set_compact(new_compact)
             nbr_model = torch.nn.Module()
             nbr_model.arch = nbr

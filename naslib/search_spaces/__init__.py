@@ -8,7 +8,7 @@ from .natsbenchsize.graph import NATSBenchSizeSearchSpace
 from .hierarchical.graph import HierarchicalSearchSpace
 from .transbench101.graph import TransBench101SearchSpaceMicro
 from .transbench101.graph import TransBench101SearchSpaceMacro
-
+from .nasbenchspikingasr.graph import NasBenchSpikingASRSearchSpace
 from .transbench101.api import TransNASBenchAPI
 
 # FIXME Adapt to all search spaces

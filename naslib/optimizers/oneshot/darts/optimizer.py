@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import logging
 from torch.autograd import Variable
+import torch.nn.functional as F
+
 
 from naslib.search_spaces.core.primitives import MixedOp
 from naslib.optimizers.core.metaclasses import MetaOptimizer
@@ -54,6 +56,7 @@ class DARTSOptimizer(MetaOptimizer):
         """
         super(DARTSOptimizer, self).__init__()
 
+        self.using_step_function = True
         self.config = config
         self.op_optimizer = op_optimizer
         self.arch_optimizer = arch_optimizer
@@ -61,7 +64,9 @@ class DARTSOptimizer(MetaOptimizer):
         self.grad_clip = self.config.search.grad_clip
 
         self.architectural_weights = torch.nn.ParameterList()
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # print(self.config)
+        self.device = torch.device(f"cuda:{self.config.gpu}" if torch.cuda.is_available() else "cpu")
+        # self.device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
         self.perturb_alphas = None
         self.epsilon = 0
@@ -69,6 +74,9 @@ class DARTSOptimizer(MetaOptimizer):
         self.dataset = config.dataset
 
     def adapt_search_space(self, search_space, scope=None, **kwargs):
+        """
+        This fi
+        """
         # We are going to modify the search space
         self.search_space = search_space
         graph = search_space.clone()
@@ -86,7 +94,6 @@ class DARTSOptimizer(MetaOptimizer):
         graph.update_edges(
             self.__class__.update_ops, scope=scope, private_edge_data=True
         )
-
         for alpha in graph.get_all_edge_data("alpha"):
             self.architectural_weights.append(alpha)
 
@@ -149,7 +156,7 @@ class DARTSOptimizer(MetaOptimizer):
         input_train, target_train = data_train
         input_val, target_val = data_val
 
-        unrolled = False  # what it this?
+        unrolled = False  # what it this? 
 
         if unrolled:
             raise NotImplementedError()
@@ -157,7 +164,19 @@ class DARTSOptimizer(MetaOptimizer):
             # Update architecture weights
             self.arch_optimizer.zero_grad()
             logits_val = self.graph(input_val)
-            val_loss = self.loss(logits_val, target_val)
+            
+            logits_val = logits_val.transpose(1, 2)  # Change logits_val shape to (64, 21, 25)
+            logits_val = torch.mean(logits_val, dim=2)
+            # target_val = target_val.unsqueeze(-1)  # Change target_val shape to (64, 1)
+            # assert torch.all(torch.eq(target_val.expand(-1, 25),target_val.repeat(1, 25)))
+            # target_val = target_val.repeat(1, 25)
+            # target_val = target_val.unsqueeze(dim=1)
+            # print('logits_val.shape', logits_val.shape)
+            target_val = target_val.long()
+            # print('target_val.shape', target_val.shape)
+            # val_loss = self.loss(logits_val, target_val)
+            # print("Unique target values:", torch.unique(target_val))
+            val_loss = F.cross_entropy(logits_val, target_val)
             val_loss.backward()
 
             self.arch_optimizer.step()
@@ -165,6 +184,9 @@ class DARTSOptimizer(MetaOptimizer):
             # Update op weights
             self.op_optimizer.zero_grad()
             logits_train = self.graph(input_train)
+            logits_train = logits_train.transpose(1, 2)  # Change logits_train shape to (64, 21, 25)
+            logits_train = torch.mean(logits_train, dim=2)
+            target_train = target_train.long()
             train_loss = self.loss(logits_train, target_train)
             train_loss.backward()
             if self.grad_clip:
@@ -200,15 +222,26 @@ class DARTSOptimizer(MetaOptimizer):
     def get_model_size(self):
         return count_parameters_in_MB(self.graph)
 
-    def test_statistics(self):
+    def test_statistics(self, data_val):
         # nb301 is not there but we use it anyways to generate the arch strings.
         # if self.graph.QUERYABLE:
-        try:
-            # record anytime performance
-            best_arch = self.get_final_architecture()
-            return best_arch.query(Metric.TEST_ACCURACY, self.dataset)
-        except:
-            return None
+        best_arch = self.get_final_architecture()
+        input_val, target_val = data_val
+            # Update architecture weights
+        logits_val = best_arch(input_val)
+        logits_val = logits_val.transpose(1, 2)  # Change logits_val shape to (64, 21, 25)
+        logits_val = torch.mean(logits_val, dim=2)
+        target_val = target_val.long()
+        val_loss = F.cross_entropy(logits_val, target_val)
+        return val_loss
+        # try:
+        #     # record anytime performance
+        #     best_arch = self.get_final_architecture()
+        #     return best_arch.query(Metric.TEST_ACCURACY, self.dataset)
+        # except Exception as e:
+        #     print(e)
+        #     logger.error("Failed to query the final architecture: {}".format(e))
+        #     return None
 
     def _step(
         self,
@@ -281,5 +314,7 @@ class DARTSMixedOp(MixedOp):
         return torch.softmax(weights, dim=-1)
 
     def apply_weights(self, x, weights):        
-        return sum(w * op(x, None) for w, op in zip(weights, self.primitives))
+        return torch.sum(torch.stack([w * op(x, None) for w, op in zip(weights, self.primitives)]), dim=0)
+
+        # return sum(w * op(x, None) for w, op in zip(weights, self.primitives))
 
